@@ -2,7 +2,17 @@
 # AK TRS Normal Cost/Benefit Model #
 ####################################
 
+#https://drb.alaska.gov/docs/valuations/TRSDBvaluation_2020.pdf
+
 ## Class Three employees*
+# Mortality (Pre-Commencement)
+# Mortality rates based upon the 2013-2017 actual experience.
+# RP-2014 white-collar employee table, benefit-weighted, rolled back to 2006, and projected with MP-2017 generational improvement.
+# Deaths are assumed to result from occupational causes 15% of the time.
+# 
+# Mortality (Post-Commencement)
+# Mortality rates based upon the 2013-2017 actual experience.
+# 93% of male and 90% of female rates of RP-2014 white-collar healthy annuitant table, benefit-weighted, rolled back to 2006, and projected with MP-2017 generational improvement.
 
 rm(list = ls())
 library("readxl")
@@ -48,7 +58,9 @@ Age <- 20:120
 YOS <- 0:100
 RetirementAge <- 20:120
 Years <- 2011:2121    #(why 2121? Because 120 - 20 + 2021 = 2121)
-#Updated from 2010 to 2011
+#Updated from 2010 to 201
+
+
 
 #Assigning individual  Variables
 model_inputs <- read_excel(FileName, sheet = 'Main')
@@ -82,8 +94,8 @@ SalaryEntry <- read_excel(FileName, sheet = ifelse(tier == 3, "Salary and Headco
 #View(SalaryEntry)
 
 ##############
-TerminationRateAfter10 <- read_excel(FileName, sheet = 'Termination Rates after 10')#Updated to SCRS*
-TerminationRateBefore10 <- read_excel(FileName, sheet = 'Termination Rates before 10')#Updated to SCRS*
+TerminationRateAfter8 <- read_excel(FileName, sheet = 'Termination Rates after 8')#Updated to SCRS*
+TerminationRateBefore8 <- read_excel(FileName, sheet = 'Termination Rates before 8')#Updated to SCRS*
 
 ################################# Function
 BenefitModel <- function(employee = "Blend", tier = 3, NCost = FALSE,
@@ -335,16 +347,14 @@ BenefitModel <- function(employee = "Blend", tier = 3, NCost = FALSE,
   SeparationRates  <- SeparationRates %>% inner_join(x, by = "entry_age")
   SeparationRates  <- SeparationRates %>% select(-first_retire) %>% mutate(YearsFirstRetire = first_ret-Age)
   
-  
   #Separation Rates
   SeparationRates <- SeparationRates %>% 
-    left_join(TerminationRateAfter10, by = "YearsFirstRetire") %>% #Joining by new YearsFirstRetire
-    left_join(TerminationRateBefore10, by = "YOS") %>% # Joining by YOS & AGE
+    left_join(TerminationRateAfter8, by = "Age") %>% #Joining by new YearsFirstRetire
+    left_join(TerminationRateBefore8, by = "YOS") %>% # Joining by YOS & AGE
     left_join(RetirementRates, by = c("Age")) %>%
     ### Additions ###
     mutate_all(as.numeric) %>% 
     replace(is.na(.), 0)  
-  
   
   if(tier == 2){ 
     SeparationRates <- SeparationRates %>% 
@@ -373,12 +383,12 @@ BenefitModel <- function(employee = "Blend", tier = 3, NCost = FALSE,
                                                 else if(employee == "Teachers"){ReducedMaleTeacher}
                                                 else{ReducedMaleGeneral},#Using 6 ifelse/if statements for 3 EE & 3 ret. types
                                                 ifelse(YOS < 11, 
-                                                       if(employee == "Blend"){TermBefore10BlendMale}
-                                                       else if(employee == "Teachers"){TermBefore10TeacherMale}
-                                                       else{TermBefore10GeneralMale}, 
-                                                       if(employee == "Blend"){TermAfter10BlendMale}
-                                                       else if(employee == "Teachers"){TermAfter10TeacherMale}
-                                                       else{TermAfter10GeneralMale})))),
+                                                       if(employee == "Blend"){TermBefore8BlendMale}
+                                                       else if(employee == "Teachers"){TermBefore8TeacherMale}
+                                                       else{TermBefore8GeneralMale}, 
+                                                       if(employee == "Blend"){TermAfter8BlendMale}
+                                                       else if(employee == "Teachers"){TermAfter8TeacherMale}
+                                                       else{TermAfter8GeneralMale})))),
              SepRateFemale = ifelse(retirement_type == "Normal With Rule of 90", Rule90,
                                     ifelse(retirement_type == "Normal No Rule of 90", if(employee == "Blend"){NormalFeMaleBlend}
                                            else if(employee == "Teachers"){NormalFeMaleTeacher}
@@ -386,13 +396,13 @@ BenefitModel <- function(employee = "Blend", tier = 3, NCost = FALSE,
                                            ifelse(retirement_type == "Reduced", if(employee == "Blend"){ReducedFeMaleBlend}
                                                   else if(employee == "Teachers"){ReducedFeMaleTeacher}
                                                   else{ReducedFeMaleGeneral},#Using 6 ifelse/if statements for 3 EE & 3 ret. types
-                                                  ifelse(YOS < 11, 
-                                                         if(employee == "Blend"){TermBefore10BlendFeMale}
-                                                         else if(employee == "Teachers"){TermBefore10TeacherFeMale}
-                                                         else{TermBefore10GeneralFeMale}, 
-                                                         if(employee == "Blend"){TermAfter10BlendFeMale}
-                                                         else if(employee == "Teachers"){TermAfter10TeacherFeMale}
-                                                         else{TermAfter10GeneralFeMale})))),
+                                                  ifelse(YOS < 8, 
+                                                         if(employee == "Blend"){TermBefore8BlendFeMale}
+                                                         else if(employee == "Teachers"){TermBefore8TeacherFeMale}
+                                                         else{TermBefore8GeneralFeMale}, 
+                                                         if(employee == "Blend"){TermAfter8BlendFeMale}
+                                                         else if(employee == "Teachers"){TermAfter8TeacherFeMale}
+                                                         else{TermAfter8GeneralFeMale})))),
              SepRate = ((SepRateMale+SepRateFemale)/2)) %>% 
       group_by(entry_age) %>% 
       mutate(RemainingProb = cumprod(1 - lag(SepRate, default = 0)),
@@ -414,12 +424,12 @@ BenefitModel <- function(employee = "Blend", tier = 3, NCost = FALSE,
                                                 else if(employee == "Teachers"){ReducedMaleTeacher}
                                                 else{ReducedMaleGeneral},#Using 6 ifelse/if statements for 3 EE & 3 ret. types
                                                 ifelse(YOS < 11, 
-                                                       if(employee == "Blend"){TermBefore10BlendMale}
-                                                       else if(employee == "Teachers"){TermBefore10TeacherMale}
-                                                       else{TermBefore10GeneralMale}, 
-                                                       if(employee == "Blend"){TermAfter10BlendMale}
-                                                       else if(employee == "Teachers"){TermAfter10TeacherMale}
-                                                       else{TermAfter10GeneralMale})))),
+                                                       if(employee == "Blend"){TermBefore8BlendMale}
+                                                       else if(employee == "Teachers"){TermBefore8TeacherMale}
+                                                       else{TermBefore8GeneralMale}, 
+                                                       if(employee == "Blend"){TermAfter8BlendMale}
+                                                       else if(employee == "Teachers"){TermAfter8TeacherMale}
+                                                       else{TermAfter8GeneralMale})))),
              SepRateFemale = ifelse(retirement_type == "Normal No Rule of 90", if(employee == "Blend"){NormalFeMaleBlend.x}
                                     else if(employee == "Teachers"){NormalFeMaleTeacher.x}
                                     else{NormalFeMaleGeneral.x},
@@ -430,12 +440,12 @@ BenefitModel <- function(employee = "Blend", tier = 3, NCost = FALSE,
                                                   else if(employee == "Teachers"){ReducedFeMaleTeacher}
                                                   else{ReducedFeMaleGeneral},#Using 6 ifelse/if statements for 3 EE & 3 ret. types
                                                   ifelse(YOS < 11, 
-                                                         if(employee == "Blend"){TermBefore10BlendFeMale}
-                                                         else if(employee == "Teachers"){TermBefore10TeacherFeMale}
-                                                         else{TermBefore10GeneralFeMale}, 
-                                                         if(employee == "Blend"){TermAfter10BlendFeMale}
-                                                         else if(employee == "Teachers"){TermAfter10TeacherFeMale}
-                                                         else{TermAfter10GeneralFeMale})))),
+                                                         if(employee == "Blend"){TermBefore8BlendFeMale}
+                                                         else if(employee == "Teachers"){TermBefore8TeacherFeMale}
+                                                         else{TermBefore8GeneralFeMale}, 
+                                                         if(employee == "Blend"){TermAfter8BlendFeMale}
+                                                         else if(employee == "Teachers"){TermAfter8TeacherFeMale}
+                                                         else{TermAfter8GeneralFeMale})))),
              SepRate = ((SepRateMale+SepRateFemale)/2)) %>% 
       group_by(entry_age) %>% 
       mutate(RemainingProb = cumprod(1 - lag(SepRate, default = 0)),
